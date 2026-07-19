@@ -34,15 +34,16 @@ def clean_sql(raw_output: str) -> str:
 
 
 def call_llm(prompt: str, model: str) -> str:
+    kwargs = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_completion_tokens": 2000,
+    }
+    # gpt-5 계열, o-series 등 reasoning 모델은 temperature 커스텀 값을 지원 안 함 (기본값만 허용)
+    if not model.startswith(("gpt-5", "o1", "o3", "o4")):
+        kwargs["temperature"] = 0.0
 
-    # TODO 3: LLM 호출 (OpenAI API 사용)
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.0,
-        max_tokens=512,
-    )
-
+    response = client.chat.completions.create(**kwargs)
     return clean_sql(response.choices[0].message.content)
 
 
