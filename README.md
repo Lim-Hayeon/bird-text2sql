@@ -43,6 +43,7 @@ SQL
 스키마는 SQLite의 `sqlite_master`에서 원본 `CREATE TABLE` 문을 그대로 추출해 사용합니다. 평가는 문자열 비교가 아닌 **실행 결과 비교(EX)** 방식을 사용합니다 — predicted SQL과 gold SQL을 각각 실행해 결과 집합이 일치하는지 확인합니다.
 
 ## 📁 Project Structure
+```
 bird-text2sql/
 ├── src/
 │   ├── prompts.py      # Schema 추출 + Prompt 조립
@@ -54,6 +55,7 @@ bird-text2sql/
 ├── predictions_*.json
 └── error_analysis/
 └── wrong_cases.json
+```
 
 ## 🚀 Usage
 
