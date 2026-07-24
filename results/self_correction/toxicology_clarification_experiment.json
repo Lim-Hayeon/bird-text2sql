@@ -1,0 +1,232 @@
+[
+  {
+    "question_id": 197,
+    "question": "Calculate the average number of oxygen atoms in single-bonded molecules.",
+    "gold_sql": "SELECT AVG(oxygen_count) FROM (SELECT T1.molecule_id, COUNT(T1.element) AS oxygen_count FROM atom AS T1 INNER JOIN bond AS T2 ON T1.molecule_id = T2.molecule_id  WHERE T2.bond_type = '-' AND T1.element = 'o'  GROUP BY T1.molecule_id) AS oxygen_counts",
+    "formats": {
+      "A": {
+        "clarification": "이 DB에서 atom과 bond는 둘 다 molecule_id 컬럼을 가지고 있습니다.",
+        "revised_sql": "SELECT AVG(oxygen_count) AS average_oxygen_atoms\nFROM (\n    SELECT m.molecule_id, COUNT(a.atom_id) AS oxygen_count\n    FROM molecule m\n    JOIN bond b ON m.molecule_id = b.molecule_id\n    JOIN connected c ON b.bond_id = c.bond_id\n    JOIN atom a ON c.atom_id = a.atom_id\n    WHERE b.bond_type = '-' AND a.element = 'o'\n    GROUP BY m.molecule_id\n) AS oxygen_counts\nWHERE m.molecule_id IN (SELECT DISTINCT molecule_id FROM bond WHERE bond_type = '-');",
+        "correct": false
+      },
+      "B": {
+        "clarification": "atom과 bond를 연결할 때, connected 테이블을 거쳐야 하나요, 아니면 둘 다 가진 molecule_id로 바로 연결해도 되나요?",
+        "revised_sql": "SELECT AVG(oxygen_count) AS average_oxygen_atoms\nFROM (\n    SELECT m.molecule_id, COUNT(a.atom_id) AS oxygen_count\n    FROM molecule m\n    JOIN bond b ON m.molecule_id = b.molecule_id\n    JOIN atom a ON m.molecule_id = a.molecule_id\n    WHERE b.bond_type = '-' AND a.element = 'o'\n    GROUP BY m.molecule_id\n) AS oxygen_counts;",
+        "correct": true
+      },
+      "C": {
+        "clarification": "connected 테이블 없이, atom과 bond를 molecule_id로 직접 조인해서 계산해주세요.",
+        "revised_sql": "SELECT AVG(oxygen_count) AS average_oxygen_atoms\nFROM (\n    SELECT m.molecule_id, COUNT(a.atom_id) AS oxygen_count\n    FROM molecule m\n    JOIN bond b ON m.molecule_id = b.molecule_id\n    JOIN atom a ON m.molecule_id = a.molecule_id\n    WHERE b.bond_type = '-' AND a.element = 'o'\n    GROUP BY m.molecule_id\n) AS oxygen_counts;",
+        "correct": true
+      }
+    },
+    "min_level_success": "B"
+  },
+  {
+    "question_id": 200,
+    "question": "Find the triple-bonded molecules which are carcinogenic.",
+    "gold_sql": "SELECT DISTINCT T2.molecule_id FROM bond AS T1 INNER JOIN molecule AS T2 ON T1.molecule_id = T2.molecule_id WHERE T1.bond_type = '#' AND T2.label = '+'",
+    "formats": {
+      "A": {
+        "clarification": "carcinogenic 여부는 이미 조건절에 있습니다.",
+        "revised_sql": "SELECT DISTINCT m.molecule_id \nFROM molecule m \nJOIN bond b ON m.molecule_id = b.molecule_id \nWHERE b.bond_type = '#';",
+        "correct": false
+      },
+      "B": {
+        "clarification": "결과에 분자 ID만 필요한가요, 아니면 label 값도 같이 보여줘야 하나요?",
+        "revised_sql": "SELECT DISTINCT m.molecule_id \nFROM molecule m \nJOIN bond b ON m.molecule_id = b.molecule_id \nWHERE b.bond_type = '#' AND m.label = '+';",
+        "correct": true
+      },
+      "C": {
+        "clarification": "molecule_id만 반환해주세요, label은 빼주세요.",
+        "revised_sql": "SELECT DISTINCT m.molecule_id \nFROM molecule m \nJOIN bond b ON m.molecule_id = b.molecule_id \nWHERE b.bond_type = '#' AND m.label = '+';",
+        "correct": true
+      }
+    },
+    "min_level_success": "B"
+  },
+  {
+    "question_id": 207,
+    "question": "What elements are in a double type bond?",
+    "gold_sql": "SELECT DISTINCT T1.element FROM atom AS T1 INNER JOIN bond AS T2 ON T1.molecule_id = T2.molecule_id INNER JOIN connected AS T3 ON T1.atom_id = T3.atom_id WHERE T2.bond_type = '='",
+    "formats": {
+      "A": {
+        "clarification": "결합은 두 원자를 연결합니다. 원소 종류 자체는 몇 가지 안 됩니다 (c, o, h, n 등).",
+        "revised_sql": "SELECT DISTINCT a1.element, a2.element \nFROM connected c \nJOIN atom a1 ON c.atom_id = a1.atom_id \nJOIN atom a2 ON c.atom_id2 = a2.atom_id \nJOIN bond b ON c.bond_id = b.bond_id \nWHERE b.bond_type = '=';",
+        "correct": false
+      },
+      "B": {
+        "clarification": "결합에 참여하는 원소를 '쌍'으로 나열하길 원하시나요, 아니면 등장하는 원소의 '종류 목록'을 원하시나요?",
+        "revised_sql": "SELECT DISTINCT a1.element \nFROM connected c \nJOIN atom a1 ON c.atom_id = a1.atom_id \nJOIN bond b ON c.bond_id = b.bond_id \nWHERE b.bond_type = '=';",
+        "correct": false
+      },
+      "C": {
+        "clarification": "쌍이 아니라, 중복 없이 원소 종류만 하나의 리스트로 반환해주세요.",
+        "revised_sql": "SELECT DISTINCT a1.element \nFROM connected c \nJOIN atom a1 ON c.atom_id = a1.atom_id \nJOIN atom a2 ON c.atom_id2 = a2.atom_id \nJOIN bond b ON c.bond_id = b.bond_id \nWHERE b.bond_type = '=';",
+        "correct": false
+      }
+    },
+    "min_level_success": null
+  },
+  {
+    "question_id": 215,
+    "question": "How many atoms with iodine and with sulfur type elements are there in single bond molecules?",
+    "gold_sql": "SELECT COUNT(DISTINCT CASE WHEN T1.element = 'i' THEN T1.atom_id ELSE NULL END) AS iodine_nums , COUNT(DISTINCT CASE WHEN T1.element = 's' THEN T1.atom_id ELSE NULL END) AS sulfur_nums FROM atom AS T1 INNER JOIN connected AS T2 ON T1.atom_id = T2.atom_id INNER JOIN bond AS T3 ON T2.bond_id = T3.bond_id WHERE T3.bond_type = '-'",
+    "formats": {
+      "A": {
+        "clarification": "iodine과 sulfur는 서로 다른 원소입니다.",
+        "revised_sql": "SELECT COUNT(DISTINCT a.atom_id) AS atom_count\nFROM atom a\nJOIN connected c ON a.atom_id = c.atom_id OR a.atom_id = c.atom_id2\nJOIN bond b ON c.bond_id = b.bond_id\nWHERE (a.element = 'i' AND b.bond_type = '-') OR (a.element = 's' AND b.bond_type = '-');",
+        "correct": false
+      },
+      "B": {
+        "clarification": "iodine 개수와 sulfur 개수를 하나로 합친 값을 원하시나요, 아니면 각각 따로 알고 싶으신가요?",
+        "revised_sql": "SELECT a.element, COUNT(DISTINCT a.atom_id) AS atom_count\nFROM atom a\nJOIN connected c ON a.atom_id = c.atom_id OR a.atom_id = c.atom_id2\nJOIN bond b ON c.bond_id = b.bond_id\nWHERE (a.element = 'i' OR a.element = 's') AND b.bond_type = '-'\nGROUP BY a.element;",
+        "correct": false
+      },
+      "C": {
+        "clarification": "두 원소의 개수를 각각 별도의 컬럼으로 따로 반환해주세요.",
+        "revised_sql": "SELECT \n    COUNT(DISTINCT CASE WHEN a.element = 'i' THEN a.atom_id END) AS iodine_count,\n    COUNT(DISTINCT CASE WHEN a.element = 's' THEN a.atom_id END) AS sulfur_count\nFROM atom a\nJOIN connected c ON a.atom_id = c.atom_id OR a.atom_id = c.atom_id2\nJOIN bond b ON c.bond_id = b.bond_id\nWHERE b.bond_type = '-';",
+        "correct": true
+      }
+    },
+    "min_level_success": "C"
+  },
+  {
+    "question_id": 218,
+    "question": "What percentage of carcinogenic-type molecules does not contain fluorine?",
+    "gold_sql": "SELECT CAST(COUNT(DISTINCT CASE WHEN T1.element <> 'f' THEN T2.molecule_id ELSE NULL END) AS REAL) * 100 / COUNT(DISTINCT T2.molecule_id) FROM atom AS T1 INNER JOIN molecule AS T2 ON T1.molecule_id = T2.molecule_id WHERE T2.label = '+'",
+    "formats": {
+      "A": {
+        "clarification": "한 분자 안에 여러 개의 원자가 있을 수 있습니다.",
+        "revised_sql": "SELECT 100 - (COUNT(DISTINCT CASE WHEN a.element = 'f' THEN m.molecule_id END) * 100.0 / COUNT(DISTINCT m.molecule_id)) AS percentage_non_fluorine\nFROM molecule m\nJOIN atom a ON m.molecule_id = a.molecule_id\nWHERE m.label = '+' AND m.molecule_id IN (SELECT DISTINCT molecule_id FROM atom WHERE element != 'f');",
+        "correct": false
+      },
+      "B": {
+        "clarification": "'불소를 포함하지 않는다'는 게, 그 분자의 모든 원자가 불소가 아니라는 뜻인가요, 아니면 불소가 아닌 원자가 하나라도 있으면 되는 건가요?",
+        "revised_sql": "SELECT 100 - (COUNT(DISTINCT CASE WHEN a.element = 'f' THEN m.molecule_id END) * 100.0 / COUNT(DISTINCT m.molecule_id)) AS percentage_non_fluorine\nFROM molecule m\nJOIN atom a ON m.molecule_id = a.molecule_id\nWHERE m.label = '+' AND m.molecule_id NOT IN (\n    SELECT DISTINCT m2.molecule_id\n    FROM molecule m2\n    JOIN atom a2 ON m2.molecule_id = a2.molecule_id\n    WHERE a2.element = 'f'\n);",
+        "correct": true
+      },
+      "C": {
+        "clarification": "분자 안에 불소 원자가 하나도 없는 경우만 '포함 안 함'으로 계산해주세요.",
+        "revised_sql": "SELECT (COUNT(DISTINCT m.molecule_id) - COUNT(DISTINCT CASE WHEN a.element = 'f' THEN m.molecule_id END)) * 100.0 / COUNT(DISTINCT m.molecule_id) AS percentage_non_fluorine\nFROM molecule m\nJOIN atom a ON m.molecule_id = a.molecule_id\nWHERE m.label = '+' \nGROUP BY m.molecule_id\nHAVING COUNT(DISTINCT CASE WHEN a.element = 'f' THEN a.atom_id END) = 0;",
+        "correct": true
+      }
+    },
+    "min_level_success": "B"
+  },
+  {
+    "question_id": 231,
+    "question": "Which bond type accounted for the majority of the bonds found in molecule TR010 and state whether or not this molecule is carcinogenic?",
+    "gold_sql": "SELECT T.bond_type FROM ( SELECT T1.bond_type, COUNT(T1.molecule_id) FROM bond AS T1  WHERE T1.molecule_id = 'TR010' GROUP BY T1.bond_type ORDER BY COUNT(T1.molecule_id) DESC LIMIT 1 ) AS T",
+    "formats": {
+      "A": {
+        "clarification": "질문은 bond_type이 무엇인지만 묻고 있습니다.",
+        "revised_sql": "SELECT bond_type\nFROM bond\nWHERE molecule_id = 'TR010'\nGROUP BY bond_type\nORDER BY COUNT(bond_type) DESC\nLIMIT 1;",
+        "correct": true
+      },
+      "B": {
+        "clarification": "결과에 개수(count)도 같이 보여줘야 하나요, 아니면 bond_type 값만 필요한가요?",
+        "revised_sql": "SELECT bond_type, COUNT(bond_type) AS bond_count\nFROM bond\nWHERE molecule_id = 'TR010'\nGROUP BY bond_type\nORDER BY bond_count DESC\nLIMIT 1;",
+        "correct": false
+      },
+      "C": {
+        "clarification": "bond_type 컬럼만 반환해주세요, count는 빼주세요.",
+        "revised_sql": "SELECT bond_type\nFROM bond\nWHERE molecule_id = 'TR010'\nGROUP BY bond_type\nORDER BY COUNT(bond_type) DESC\nLIMIT 1;",
+        "correct": true
+      }
+    },
+    "min_level_success": "A"
+  },
+  {
+    "question_id": 234,
+    "question": "How many bonds which involved atom 12 does molecule TR009 have?",
+    "gold_sql": "SELECT COUNT(T2.bond_id) FROM bond AS T1 INNER JOIN connected AS T2 ON T1.bond_id = T2.bond_id WHERE T1.molecule_id = 'TR009' AND T2.atom_id = T1.molecule_id || '_1' OR T2.atom_id2 = T1.molecule_id || '_2'",
+    "formats": {
+      "A": {
+        "clarification": "atom_id는 'TR009_12'처럼 분자ID_원자번호 형식입니다.",
+        "revised_sql": "SELECT COUNT(*) \nFROM connected \nWHERE atom_id = 'TR009_12' OR atom_id2 = 'TR009_12';",
+        "correct": false
+      },
+      "B": {
+        "clarification": "atom_id 컬럼과 atom_id2 컬럼 중 하나라도 일치하면 되는 건가요?",
+        "revised_sql": "SELECT COUNT(*) \nFROM connected \nWHERE atom_id = 'TR009_12' OR atom_id2 = 'TR009_12';",
+        "correct": false
+      },
+      "C": {
+        "clarification": "hint에 나온 조건 그대로 다시 한 번 확인해서 작성해주세요.",
+        "revised_sql": "SELECT COUNT(*) \nFROM connected \nWHERE atom_id = 'TR009_12' OR atom_id2 = 'TR009_12';",
+        "correct": false
+      }
+    },
+    "min_level_success": null
+  },
+  {
+    "question_id": 248,
+    "question": "What are the atoms of the triple bond with the molecule \"TR041\"?",
+    "gold_sql": "SELECT T2.atom_id, T2.atom_id2 FROM atom AS T1 INNER JOIN connected AS T2 ON T1.atom_id = T2.atom_id INNER JOIN bond AS T3 ON T2.bond_id = T3.bond_id WHERE T3.bond_type = '#' AND T3.molecule_id = 'TR041'",
+    "formats": {
+      "A": {
+        "clarification": "bond 테이블의 한 row는 두 원자 사이의 결합 하나를 의미합니다.",
+        "revised_sql": "SELECT a1.atom_id, a2.atom_id \nFROM bond b \nJOIN connected c1 ON b.bond_id = c1.bond_id \nJOIN connected c2 ON c1.atom_id2 = c2.atom_id \nJOIN atom a1 ON c1.atom_id = a1.atom_id \nJOIN atom a2 ON c2.atom_id2 = a2.atom_id \nWHERE b.molecule_id = 'TR041' AND b.bond_type = '#';",
+        "correct": false
+      },
+      "B": {
+        "clarification": "'triple bond의 원자들'이 세 개의 원자를 찾으라는 뜻인가요, 아니면 그 결합에 참여하는 두 원자를 찾으라는 뜻인가요?",
+        "revised_sql": "SELECT a1.atom_id, a2.atom_id \nFROM connected c \nJOIN bond b ON c.bond_id = b.bond_id \nJOIN atom a1 ON c.atom_id1 = a1.atom_id \nJOIN atom a2 ON c.atom_id2 = a2.atom_id \nWHERE b.molecule_id = 'TR041' AND b.bond_type = '#';",
+        "correct": false
+      },
+      "C": {
+        "clarification": "triple bond는 원자 두 개 사이의 결합입니다. 그 결합에 연결된 두 원자만 반환해주세요.",
+        "revised_sql": "SELECT a1.atom_id, a2.atom_id \nFROM connected c \nJOIN bond b ON c.bond_id = b.bond_id \nJOIN atom a1 ON c.atom_id1 = a1.atom_id \nJOIN atom a2 ON c.atom_id2 = a2.atom_id \nWHERE b.molecule_id = 'TR041' AND b.bond_type = '#';",
+        "correct": false
+      }
+    },
+    "min_level_success": null
+  },
+  {
+    "question_id": 281,
+    "question": "Tally the toxicology element of the 4th atom of each molecule that was carcinogenic.",
+    "gold_sql": "SELECT DISTINCT T1.element FROM atom AS T1 INNER JOIN molecule AS T2 ON T1.molecule_id = T2.molecule_id WHERE T2.label = '+' AND SUBSTR(T1.atom_id, -1) = '4' AND LENGTH(T1.atom_id) = 7",
+    "formats": {
+      "A": {
+        "clarification": "atom_id의 길이는 분자마다 다를 수 있습니다 (원자가 10개 넘는 분자도 있음).",
+        "revised_sql": "SELECT DISTINCT a.element\nFROM atom a\nJOIN molecule m ON a.molecule_id = m.molecule_id\nWHERE m.label = '+' AND LENGTH(a.atom_id) >= 7 AND SUBSTR(a.atom_id, 7, 1) = '4';",
+        "correct": false
+      },
+      "B": {
+        "clarification": "atom_id의 특정 위치(7번째 글자)를 보는 게 맞나요, 아니면 원자 번호가 항상 마지막 자리에 오는 걸 기준으로 봐야 하나요?",
+        "revised_sql": "SELECT DISTINCT a.element\nFROM atom a\nJOIN molecule m ON a.molecule_id = m.molecule_id\nWHERE m.label = '+' AND SUBSTR(a.atom_id, -1) = '4';",
+        "correct": false
+      },
+      "C": {
+        "clarification": "atom_id 뒤에서부터 세어서 마지막 글자가 '4'인 것만 찾아주세요. 단, 전체 길이가 7자리인 것만 (두 자리 번호는 제외).",
+        "revised_sql": "SELECT DISTINCT a.element\nFROM atom a\nJOIN molecule m ON a.molecule_id = m.molecule_id\nWHERE m.label = '+' AND LENGTH(a.atom_id) = 7 AND SUBSTR(a.atom_id, -1) = '4';",
+        "correct": true
+      }
+    },
+    "min_level_success": "C"
+  },
+  {
+    "question_id": 327,
+    "question": "Which non-carcinogenic molecules consisted more than 5 atoms?",
+    "gold_sql": "SELECT T.molecule_id FROM ( SELECT T1.molecule_id, COUNT(T2.atom_id) FROM molecule AS T1 INNER JOIN atom AS T2 ON T1.molecule_id = T2.molecule_id WHERE T1.label = '-' GROUP BY T1.molecule_id HAVING COUNT(T2.atom_id) > 5 ) t",
+    "formats": {
+      "A": {
+        "clarification": "label 값은 이미 조건절(WHERE label = '-')에 사용되고 있습니다.",
+        "revised_sql": "SELECT m.molecule_id \nFROM molecule m \nJOIN atom a ON m.molecule_id = a.molecule_id \nGROUP BY m.molecule_id \nHAVING COUNT(a.atom_id) > 5 AND m.label = '-';",
+        "correct": true
+      },
+      "B": {
+        "clarification": "결과에 label도 같이 보여줘야 하나요, molecule_id만 있으면 되나요?",
+        "revised_sql": "SELECT m.molecule_id \nFROM molecule m \nJOIN atom a ON m.molecule_id = a.molecule_id \nWHERE m.label = '-' \nGROUP BY m.molecule_id \nHAVING COUNT(a.atom_id) > 5;",
+        "correct": true
+      },
+      "C": {
+        "clarification": "molecule_id만 반환해주세요, label은 빼주세요.",
+        "revised_sql": "SELECT m.molecule_id \nFROM molecule m \nJOIN atom a ON m.molecule_id = a.molecule_id \nWHERE m.label = '-' \nGROUP BY m.molecule_id \nHAVING COUNT(a.atom_id) > 5;",
+        "correct": true
+      }
+    },
+    "min_level_success": "A"
+  }
+]

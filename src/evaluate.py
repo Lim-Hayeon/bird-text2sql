@@ -20,15 +20,7 @@ DEFAULT_DB_ROOT = ROOT / "data" / "mini_dev_data" / "dev_databases"
 
 
 def execute_sql(db_path: str, sql: str, timeout: float = 15.0):
-    """
-    SQL 실행 결과를 반환. 에러/타임아웃 나면 None 반환.
 
-    주의: sqlite3.connect(db_path, timeout=...) 의 timeout은
-    "DB 락 대기시간"이지 "쿼리 실행시간 제한"이 아니다.
-    LLM이 만든 SQL이 JOIN 조건을 빼먹는 등 잘못 짜여지면
-    Cartesian product가 발생해서 사실상 끝나지 않을 수 있다.
-    그래서 sqlite3의 progress_handler를 이용해 진짜 실행시간 제한을 건다.
-    """
     try:
         conn = sqlite3.connect(db_path)
         start_time = time.time()
