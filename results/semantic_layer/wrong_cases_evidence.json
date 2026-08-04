@@ -1,0 +1,101 @@
+[
+  {
+    "question_id": 201,
+    "db_id": "toxicology",
+    "question": "What is the percentage of carbon in double-bond molecules?",
+    "condition": "evidence",
+    "evidence": "carbon refers to element = 'c'; double-bond molecules refers to bond_type = '='; percentage = DIVIDE(SUM(element = 'c'), COUNT(atom_id))",
+    "gold_sql": "SELECT CAST(COUNT(DISTINCT CASE WHEN T1.element = 'c' THEN T1.atom_id ELSE NULL END) AS REAL) * 100 / COUNT(DISTINCT T1.atom_id) FROM atom AS T1 INNER JOIN bond AS T2 ON T1.molecule_id = T2.molecule_id WHERE T2.bond_type = '='",
+    "predicted_sql": "SELECT DIVIDE(SUM(CASE WHEN a.element = 'c' THEN 1 ELSE 0 END), COUNT(a.atom_id)) * 100 AS carbon_percentage\nFROM atom a\nJOIN connected c ON a.atom_id = c.atom_id OR a.atom_id = c.atom_id2\nJOIN bond b ON c.bond_id = b.bond_id\nWHERE b.bond_type = '=';",
+    "model": "gpt-4o-mini",
+    "is_correct": false
+  },
+  {
+    "question_id": 207,
+    "db_id": "toxicology",
+    "question": "What elements are in a double type bond?",
+    "condition": "evidence",
+    "evidence": "double type bond refers to bond_type = '=';",
+    "gold_sql": "SELECT DISTINCT T1.element FROM atom AS T1 INNER JOIN bond AS T2 ON T1.molecule_id = T2.molecule_id INNER JOIN connected AS T3 ON T1.atom_id = T3.atom_id WHERE T2.bond_type = '='",
+    "predicted_sql": "SELECT a1.element, a2.element \nFROM connected c \nJOIN atom a1 ON c.atom_id = a1.atom_id \nJOIN atom a2 ON c.atom_id2 = a2.atom_id \nJOIN bond b ON c.bond_id = b.bond_id \nWHERE b.bond_type = '=';",
+    "model": "gpt-4o-mini",
+    "is_correct": false
+  },
+  {
+    "question_id": 215,
+    "db_id": "toxicology",
+    "question": "How many atoms with iodine and with sulfur type elements are there in single bond molecules?",
+    "condition": "evidence",
+    "evidence": "with iodine element refer to element = 'i'; with sulfur element refers to element = 's'; single type bond refers to bond_type = '-'; Should consider the distinct atoms when counting;",
+    "gold_sql": "SELECT COUNT(DISTINCT CASE WHEN T1.element = 'i' THEN T1.atom_id ELSE NULL END) AS iodine_nums , COUNT(DISTINCT CASE WHEN T1.element = 's' THEN T1.atom_id ELSE NULL END) AS sulfur_nums FROM atom AS T1 INNER JOIN connected AS T2 ON T1.atom_id = T2.atom_id INNER JOIN bond AS T3 ON T2.bond_id = T3.bond_id WHERE T3.bond_type = '-'",
+    "predicted_sql": "SELECT COUNT(DISTINCT a.atom_id) AS atom_count\nFROM atom a\nJOIN connected c ON a.atom_id = c.atom_id OR a.atom_id = c.atom_id2\nJOIN bond b ON c.bond_id = b.bond_id\nWHERE (a.element = 'i' OR a.element = 's') AND b.bond_type = '-';",
+    "model": "gpt-4o-mini",
+    "is_correct": false
+  },
+  {
+    "question_id": 227,
+    "db_id": "toxicology",
+    "question": "What is the percentage of molecules that are carcinogenic? Please provide your answer as a percentage with three decimal places.",
+    "condition": "evidence",
+    "evidence": "label = '+' mean molecules are carcinogenic; percentage = DIVIDE(SUM(label = '+'), COUNT(molecule_id)) as percent",
+    "gold_sql": "SELECT ROUND(CAST(COUNT(CASE WHEN T.label = '+' THEN T.molecule_id ELSE NULL END) AS REAL) * 100 / COUNT(T.molecule_id),3) FROM molecule t",
+    "predicted_sql": "SELECT ROUND(DIVIDE(SUM(CASE WHEN label = '+' THEN 1 ELSE 0 END), COUNT(molecule_id)) * 100, 3) AS percent FROM molecule;",
+    "model": "gpt-4o-mini",
+    "is_correct": false
+  },
+  {
+    "question_id": 228,
+    "db_id": "toxicology",
+    "question": "How much of the hydrogen in molecule TR206 is accounted for? Please provide your answer as a percentage with four decimal places.",
+    "condition": "evidence",
+    "evidence": "hydrogen refers to element = 'h'; TR206 is the molecule id; percentage = DIVIDE(SUM(element = 'h'), COUNT(atom_id)) as percent where molecule_id = 'TR206'",
+    "gold_sql": "SELECT ROUND(CAST(COUNT(CASE WHEN T.element = 'h' THEN T.atom_id ELSE NULL END) AS REAL) * 100 / COUNT(T.atom_id),4) FROM atom AS T WHERE T.molecule_id = 'TR206'",
+    "predicted_sql": "SELECT ROUND(DIVIDE(SUM(CASE WHEN element = 'h' THEN 1 ELSE 0 END), COUNT(atom_id)) * 100, 4) AS percent FROM atom WHERE molecule_id = 'TR206';",
+    "model": "gpt-4o-mini",
+    "is_correct": false
+  },
+  {
+    "question_id": 239,
+    "db_id": "toxicology",
+    "question": "How many connections does the atom 19 have?",
+    "condition": "evidence",
+    "evidence": "connections refers to bond_id; atom 19 refers to atom_id like 'TR%_19';",
+    "gold_sql": "SELECT COUNT(T.bond_id) FROM connected AS T WHERE SUBSTR(T.atom_id, -2) = '19'",
+    "predicted_sql": "SELECT COUNT(bond_id) AS connections \nFROM connected \nWHERE atom_id = 'TR%_19' OR atom_id2 = 'TR%_19';",
+    "model": "gpt-4o-mini",
+    "is_correct": false
+  },
+  {
+    "question_id": 245,
+    "db_id": "toxicology",
+    "question": "What is the average number of bonds the atoms with the element iodine have?",
+    "condition": "evidence",
+    "evidence": "atoms with the element iodine refers to element = 'i'; average = DIVIDE(COUND(bond_id), COUNT(atom_id)) where element = 'i'",
+    "gold_sql": "SELECT CAST(COUNT(T2.bond_id) AS REAL) / COUNT(T1.atom_id) FROM atom AS T1 INNER JOIN connected AS T2 ON T1.atom_id = T2.atom_id WHERE T1.element = 'i'",
+    "predicted_sql": "SELECT DIVIDE(COUNT(b.bond_id), COUNT(a.atom_id)) AS average_bonds\nFROM atom a\nLEFT JOIN connected c ON a.atom_id = c.atom_id\nLEFT JOIN bond b ON c.bond_id = b.bond_id\nWHERE a.element = 'i';",
+    "model": "gpt-4o-mini",
+    "is_correct": false
+  },
+  {
+    "question_id": 282,
+    "db_id": "toxicology",
+    "question": "What is the ratio of Hydrogen elements in molecule ID TR006? List the ratio with its label.",
+    "condition": "evidence",
+    "evidence": "hydrogen refers to element = 'h'; ratio = DIVIDE(SUM(element = 'h'), count(element)) where molecule_id = 'TR006' ; label = '+' mean molecules are carcinogenic; label = '-' means molecules are non-carcinogenic",
+    "gold_sql": "WITH SubQuery AS (SELECT DISTINCT T1.atom_id, T1.element, T1.molecule_id, T2.label FROM atom AS T1 INNER JOIN molecule AS T2 ON T1.molecule_id = T2.molecule_id WHERE T2.molecule_id = 'TR006') SELECT CAST(COUNT(CASE WHEN element = 'h' THEN atom_id ELSE NULL END) AS REAL) / (CASE WHEN COUNT(atom_id) = 0 THEN NULL ELSE COUNT(atom_id) END) AS ratio, label FROM SubQuery GROUP BY label",
+    "predicted_sql": "SELECT \n  DIVIDE(SUM(CASE WHEN element = 'h' THEN 1 ELSE 0 END), COUNT(*)) AS hydrogen_ratio,\n  label\nFROM \n  atom \nJOIN \n  molecule ON atom.molecule_id = molecule.molecule_id\nWHERE \n  molecule.molecule_id = 'TR006';",
+    "model": "gpt-4o-mini",
+    "is_correct": false
+  },
+  {
+    "question_id": 327,
+    "db_id": "toxicology",
+    "question": "Which non-carcinogenic molecules consisted more than 5 atoms?",
+    "condition": "evidence",
+    "evidence": "label = '-' means molecules are non-carcinogenic; molecules consisted more than 5 atoms refers to COUNT(molecule_id) > 5",
+    "gold_sql": "SELECT T.molecule_id FROM ( SELECT T1.molecule_id, COUNT(T2.atom_id) FROM molecule AS T1 INNER JOIN atom AS T2 ON T1.molecule_id = T2.molecule_id WHERE T1.label = '-' GROUP BY T1.molecule_id HAVING COUNT(T2.atom_id) > 5 ) t",
+    "predicted_sql": "SELECT m.molecule_id, m.label\nFROM molecule m\nJOIN atom a ON m.molecule_id = a.molecule_id\nWHERE m.label = '-'\nGROUP BY m.molecule_id\nHAVING COUNT(a.atom_id) > 5;",
+    "model": "gpt-4o-mini",
+    "is_correct": false
+  }
+]
