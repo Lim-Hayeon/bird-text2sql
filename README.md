@@ -1,6 +1,6 @@
 # 🐦 BIRD Mini-Dev Text-to-SQL Baseline
 
-Natural Language Question → SQL 변환 파이프라인. [BIRD Mini-Dev](https://bird-bench.github.io/) 벤치마크 기준으로 gpt-4o-mini의 baseline 성능을 측정하고, 오답 케이스를 분석한 프로젝트입니다. 이후 toxicology DB를 대상으로 **self-correction(실행 피드백만으로 스스로 에러를 잡아낼 수 있는지)**과 **user interaction 형식 비교(어떤 개입이면 모델이 알아듣는지)** 실험까지 진행했습니다.
+Natural Language Question → SQL 변환 파이프라인. [BIRD Mini-Dev](https://bird-bench.github.io/) 벤치마크 기준으로 gpt-4o-mini의 baseline 성능을 측정하고, 오답 케이스를 분석한 프로젝트입니다. 이후 toxicology DB를 대상으로 **self-correction(실행 피드백만으로 스스로 에러를 잡아낼 수 있는지)**, **user interaction 형식 비교(어떤 개입이면 모델이 알아듣는지)**, 그리고 **semantic layer 런북 파일럿(도메인 지식을 사전에 명시하면 모호성이 줄어드는지)** 실험까지 진행했습니다.
 
 ## 📊 Results
 
@@ -45,24 +45,34 @@ SQL
 ## 📁 Project Structure
 ```
 bird-text2sql/
+├── runbooks/
+│ ├── toxicology_runbook.md # Semantic layer 런북 (Phase A + Phase B 결합)
+│ └── toxicology_runbook_phaseA_only.md # Phase A만 남긴 ablation용 런북
 ├── src/
-│   ├── prompts.py                    # Schema 추출 + Prompt 조립
-│   ├── pipeline.py                   # LLM 호출 → SQL 생성
-│   ├── evaluate.py                   # EX 계산 + 오답 케이스 추출
-│   ├── self_correct.py               # 실행 결과 피드백만으로 self-correction 시도
-│   ├── clarification_experiment.py   # A/B/C 형식별 user interaction 비교 실험
-│   └── build_feedback_log.py         # user interaction 결과를 참고 가능한 로그로 정리
+│ ├── prompts.py # Schema 추출 + Prompt 조립
+│ ├── pipeline.py # LLM 호출 → SQL 생성
+│ ├── evaluate.py # EX 계산 + 오답 케이스 추출
+│ ├── self_correct.py # 실행 결과 피드백만으로 self-correction 시도
+│ ├── clarification_experiment.py # A/B/C 형식별 user interaction 비교 실험
+│ ├── check_detection_failed.py # detection_failed 케이스 재확인용 헬퍼
+│ ├── check_near_miss.py # 부동소수점 near-miss 오답 검증
+│ ├── build_feedback_log.py # user interaction 결과를 참고 가능한 로그로 정리
+│ ├── run_semantic_layer_experiment.py # raw/evidence/semlayer/semlayer_a 4-condition 실험
+│ └── analyze_semantic_layer.py # 4-condition 결과 비교 + McNemar 검정
 ├── data/
-│   └── mini_dev_data/                # BIRD Mini-Dev 데이터셋
+│ └── mini_dev_data/ # BIRD Mini-Dev 데이터셋
 └── results/
-    ├── predictions_*.json
-    ├── error_analysis/
-    │   └── wrong_cases.json
-    └── self_correction/
-        ├── toxicology_self_correction.json           # self-correction 실험 전체 결과
-        ├── user_interaction_needed_log.json          # user interaction 필요 후보 (detection_failed)
-        ├── toxicology_clarification_experiment.json  # A/B/C 형식 비교 실험 전체 결과
-        └── feedback_log.json                         # 카테고리별 정리된 최종 참고 로그
+├── predictions_*.json
+├── error_analysis/
+│ └── wrong_cases.json
+├── self_correction/
+│ ├── toxicology_self_correction.json # self-correction 실험 전체 결과
+│ ├── user_interaction_needed_log.json # user interaction 필요 후보 (detection_failed)
+│ ├── toxicology_clarification_experiment.json # A/B/C 형식 비교 실험 전체 결과
+│ └── feedback_log.json # 카테고리별 정리된 최종 참고 로그
+└── semantic_layer/
+├── predictions_gpt-4o-mini_{raw,evidence,semlayer,semlayer_a}.json
+└── wrong_cases_{raw,evidence,semlayer,semlayer_a}.json
 ```
 
 ## 🚀 Usage
@@ -98,6 +108,27 @@ python3 clarification_experiment.py
 
 # 3. 결과를 카테고리별 참고 로그로 정리
 python3 build_feedback_log.py
+```
+
+### Semantic Layer 파일럿 실험 실행
+
+```bash
+cd src
+
+# 4개 조건(raw/evidence/semlayer/semlayer_a) 각각 실행
+python3 run_semantic_layer_experiment.py --model gpt-4o-mini --condition raw
+python3 run_semantic_layer_experiment.py --model gpt-4o-mini --condition evidence
+python3 run_semantic_layer_experiment.py --model gpt-4o-mini --condition semlayer
+python3 run_semantic_layer_experiment.py --model gpt-4o-mini --condition semlayer_a
+
+# 채점
+python3 evaluate.py --predictions ../results/semantic_layer/predictions_gpt-4o-mini_raw.json
+python3 evaluate.py --predictions ../results/semantic_layer/predictions_gpt-4o-mini_evidence.json
+python3 evaluate.py --predictions ../results/semantic_layer/predictions_gpt-4o-mini_semlayer.json
+python3 evaluate.py --predictions ../results/semantic_layer/predictions_gpt-4o-mini_semlayer_a.json
+
+# 4-condition 비교 분석
+python3 analyze_semantic_layer.py --model gpt-4o-mini
 ```
 
 ## 🔍 Error Analysis
@@ -154,9 +185,70 @@ detection_failed 10건을 대상으로, "어떤 형식으로 개입해야 모델
 
 C까지 줘도 실패한 3건 중 실질적으로 "해결 불가능"한 경우는 gold annotation 오류로 추정되는 1건뿐이었고, 나머지 2건은 clarification 자체는 올바르게 작동했으나 모델이 구현 과정에서 별개의 새로운 실수(컬럼 누락, 존재하지 않는 컬럼 추측)를 만들어낸 경우였습니다.
 
+이 실험에서 나온 detection_failed 10건의 카테고리·해결 이력은 `build_feedback_log.py`를 통해 `feedback_log.json`으로 정리되어, 이후 유사 질문이 나왔을 때 "이 유형이면 A/B/C 중 어느 정도 개입이 필요했는지" 바로 참고할 수 있도록 구조화했습니다.
+
+## 🧩 Semantic Layer 파일럿 실험 (toxicology DB)
+
+옵션 1(query rewriting)·옵션 2(ambiguity detection)가 모호성을 **사후에** 처리하는 반응형 접근이라면, semantic layer는 마크다운 런북으로 도메인 지식·비즈니스 정의를 미리 제공해 구조적 모호성을 **사전에** 해소하는 접근입니다. 모델 자체는 수정하지 않고, 프롬프트에 주는 컨텍스트만 바꿉니다.
+
+### 런북 작성 방식
+
+toxicology DB 40문항을 **build set 10개 / excluded 3개(gold·evidence 자체 오류로 판단) / held-out 27개**로 분리했습니다. 런북은 두 단계로 작성했습니다.
+
+- **Phase A**: DDL과 BIRD 공식 database description만으로 하향식 분석 (테이블 선택, 조인 경로, 데이터 관례 등)
+- **Phase B**: build set 10개의 실제 오답(predicted_sql vs gold_sql)을 역추적해 상향식으로 보강 (예: `DIVIDE()`가 실제 함수가 아니라 pseudocode라는 규칙, `atom_id1`이 아니라 `atom_id2`라는 컬럼명 규칙 등)
+
+held-out 27개는 런북 제작에 일절 참조하지 않아, "특정 문항 암기"가 아닌 일반화 가능한 규칙인지 검증할 수 있게 설계했습니다.
+
+### 실험 설계: 4-condition 비교
+
+held-out 27문항에 대해, 같은 질문·같은 모델(gpt-4o-mini)·같은 조립 방식에서 **컨텍스트로 무엇을 주는지만** 바꿔 비교했습니다.
+
+| Condition | 제공 컨텍스트 |
+|---|---|
+| A. raw | 스키마만 |
+| B. semlayer_a | 스키마 + 런북(Phase A만, ablation) |
+| C. semlayer | 스키마 + 런북(Phase A+B 결합) |
+| D. evidence | 스키마 + BIRD 원본 hint (oracle 상한선) |
+
+### 결과 (n=27)
+
+| Condition | EX |
+|---|---|
+| raw | 22.2% (6/27) |
+| semlayer_a (Phase A만) | 40.7% (11/27) |
+| semlayer (Phase A+B) | 48.1% (13/27) |
+| evidence (oracle) | 66.7% (18/27) |
+
+**Pairwise McNemar exact test:**
+
+| 비교 | p-value | 유의성 |
+|---|---|---|
+| raw vs semlayer_a | 0.0625 | n.s. |
+| raw vs semlayer | 0.0654 | n.s. (경계) |
+| raw vs evidence | 0.0005 | *** |
+| semlayer_a vs semlayer | 0.7266 | n.s. |
+| semlayer_a vs evidence | 0.0391 | * |
+| semlayer vs evidence | 0.1797 | n.s. |
+
+### 회귀 / 일반화 분석 (raw → semlayer, held-out 27개 실측 기준)
+
+- **회귀** (raw에서 맞았는데 semlayer에서 틀림): 2건 (q213, q230)
+- **일반화** (raw에서 틀렸는데 semlayer에서 새로 맞음): 9건 (q220, q226, q227, q232, q243, q253, q255, q260, q327)
+- 순증감: +7문항 (6개 → 13개와 일치)
+
+### 해석
+
+- 런북 투입 후 정확도는 raw 대비 두 배 이상(22.2% → 48.1%) 올랐지만, n=27이라는 표본 크기 한계로 raw vs semlayer는 통계적으로 유의 수준에 근소하게 못 미칩니다(p=0.065). 표본을 늘려야 확정적 결론이 가능합니다.
+- Phase B(오답 역추적 보강)가 Phase A(스키마 기반 하향식) 단독보다 조금 더 나은 정도(40.7% → 48.1%)이며 이 차이도 유의하지 않습니다(p=0.73) — 이번 build set(10개) 규모로는 Phase B의 추가 기여가 통계적으로 뚜렷하게 갈리지 않았습니다.
+- evidence(oracle) 조건이 여전히 가장 높지만, semlayer와 evidence 간 차이(48.1% vs 66.7%)는 유의하지 않습니다(p=0.18) — 런북이 oracle hint와 통계적으로 구별하기 어려운 수준까지 격차를 좁혔을 가능성이 있으나, 이 역시 표본 크기 때문에 단정하기는 이릅니다.
+- 회귀(2건) < 일반화(9건)로, 런북이 새로 해결한 문항이 부작용으로 틀리게 만든 문항보다 많았습니다 — self-correction 실험에서 확인했던 "overcorrection risk가 낮다"는 경향과 방향이 일치합니다.
+
 ## 🔮 Future Work
 
 - Few-shot 예시를 통한 출력 형식 정확도 개선
+- Semantic layer 파일럿을 toxicology 외 다른 DB로 확장 → build set 규모를 키워 통계적 검정력 확보
+- `analyze_semantic_layer.py`의 회귀/일반화 분석 로직을 하드코딩된 추정 리스트 대신 매 실행마다의 raw 조건 실측 결과 기준으로 계산하도록 수정
 - toxicology 외 다른 DB로 self-correction / clarification 실험 확장, 카테고리 taxonomy 일반화
 - 벡터DB 기반 feedback 로그 검색 (현재는 JSON 저장까지만 구현, 유사 질문 retrieval은 다음 단계)
 - LangGraph 기반 multi-step pipeline으로 확장
